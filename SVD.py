@@ -52,8 +52,8 @@ if start_btn and uploaded_files:
             # ประมวลผลแต่ละคลิป
             clip = VideoFileClip(temp_path).resize(height=1080)
 
-            txt = TextClip(sub_header, fontsize=50, color='cyan',
-                           font='Arial-Bold', bg_color='black').set_opacity(0.6)
+            txt = TextClip(sub_header, fontsize=58, color='cyan', font='DejaVu-Sans-Bold',
+                           bg_color='black').set_opacity(0.6)
             txt = txt.set_position(('center', 100)).set_duration(clip.duration)
 
             combined = CompositeVideoClip([clip, txt])
@@ -91,8 +91,8 @@ if start_btn and uploaded_files:
             # ใช้ context manager หรือสั่งปิดคลิปหลังประมวลผล
             clip = VideoFileClip(temp_path).resize(height=1080)
 
-            txt = TextClip(sub_header, fontsize=50, color='cyan',
-                           font='Arial-Bold', bg_color='black').set_opacity(0.6)
+            txt = TextClip(sub_header, fontsize=58, color='cyan', font='DejaVu-Sans-Bold',
+                           bg_color='black').set_opacity(0.6)
             txt = txt.set_position(('center', 100)).set_duration(clip.duration)
 
             combined = CompositeVideoClip([clip, txt])
