@@ -1,18 +1,17 @@
 import streamlit as st
 import os
-import sys
 import PIL.Image
 from moviepy.editor import VideoFileClip, concatenate_videoclips, TextClip, CompositeVideoClip
 
-# แก้ปัญหา Pillow
+# --- PILLOW FIX FOR MOVIEPY ---
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
+# --- APP CONFIG ---
 st.set_page_config(page_title="Jigsaw Assembler Pro", layout="wide")
-
 st.title("🎬 Jigsaw Assembler: Terminal Mode")
 
-# --- UI Layout ---
+# --- UI LAYOUT ---
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -23,99 +22,96 @@ with col1:
 
 with col2:
     st.header("📟 Terminal Output")
-    # สร้างช่องว่างสำหรับแสดง Log เหมือนใน Terminal
     terminal_log = st.empty()
     log_content = ""
 
 
-# --- ฟังก์ชันสำหรับ Update Terminal บนหน้าเว็บ ---
 def write_to_terminal(text):
     global log_content
     log_content += text + "\n"
-    # แสดงผลในรูปแบบ Code Block เพื่อให้เหมือน Terminal
     terminal_log.code(log_content)
 
 
+# --- MAIN LOGIC ---
 if start_btn and uploaded_files:
-    write_to_terminal("📌 เริ่มต้นระบบ Jigsaw Assembler...")
-
+    write_to_terminal("📌 ระบบ Jigsaw Assembler กำลังเริ่มต้น...")
     clips = []
+    temp_files = []
+
     try:
         for uploaded_file in uploaded_files:
-            write_to_terminal(f"📥 กำลังโหลดไฟล์: {uploaded_file.name}")
+            write_to_terminal(f"📥 กำลังจัดเตรียม: {uploaded_file.name}")
 
-            # เซฟไฟล์ชั่วคราว
+            # สร้างไฟล์ชั่วคราว
             temp_path = f"temp_{uploaded_file.name}"
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
+            temp_files.append(temp_path)
 
-            # ประมวลผลแต่ละคลิป
+            # โหลดคลิปและปรับขนาด
             clip = VideoFileClip(temp_path).resize(height=1080)
 
-            txt = TextClip(sub_header, fontsize=58, color='cyan', font='DejaVu-Sans-Bold',
-                           bg_color='black').set_opacity(0.6)
+            # สร้าง Text Overlay (ใช้ Font มาตรฐาน Linux เพื่อความปลอดภัยบน Cloud)
+            txt = TextClip(
+                sub_header,
+                fontsize=60,
+                color='cyan',
+                font='DejaVu-Sans-Bold',
+                bg_color='black'
+            ).set_opacity(0.7)
+
             txt = txt.set_position(('center', 100)).set_duration(clip.duration)
 
+            # รวมคลิปกับข้อความ
             combined = CompositeVideoClip([clip, txt])
             clips.append(combined)
-            write_to_terminal(f"✅ ประมวลผล {uploaded_file.name} สำเร็จ")
-
-            os.remove(temp_path)
+            write_to_terminal(f"✅ เตรียมไฟล์ {uploaded_file.name} เรียบร้อย")
 
         if clips:
-            write_to_terminal("🎬 กำลังรวมคลิปและ Rendering (ขั้นตอนนี้ใช้เวลานิดนึง)...")
+            write_to_terminal("🎬 กำลังรวมคลิปและ Rendering Final Video... (ขั้นตอนนี้ใช้เวลาครู่หนึ่ง)")
+
+            # รวมคลิปทั้งหมดเข้าด้วยกัน
             final = concatenate_videoclips(clips, method="compose")
 
-            # สั่ง Render และให้มันบอกสถานะ
             output_file = "Jigsaw_Series_Final.mp4"
-            final.write_videofile(output_file, fps=24, codec="libx264", logger='bar')
 
-            write_to_terminal(f"🎊 Done! ไฟล์พร้อมใช้งานที่: {output_file}")
+            # สั่งเขียนไฟล์ (aac สำหรับเสียง และ libx264 สำหรับวิดีโอ)
+            final.write_videofile(output_file, fps=24, codec="libx264", audio_codec="aac")
+
+            write_to_terminal(f"🎊 การประกอบเสร็จสิ้น! ไฟล์: {output_file}")
             st.success("✅ รวมคลิปสำเร็จ!")
 
             # แสดงวิดีโอผลลัพธ์
             with open(output_file, 'rb') as v:
                 st.video(v.read())
+                st.download_button(
+                    label="📥 ดาวน์โหลดวิดีโอ (Click to Download)",
+                    data=v,
+                    file_name=output_file,
+                    mime="video/mp4"
+                )
 
     except Exception as e:
         write_to_terminal(f"❌ ERROR: {str(e)}")
-        st.error(f"เกิดข้อผิดพลาด: {e}")
+        st.error(f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
 
-        for uploaded_file in uploaded_files:
-            write_to_terminal(f"📥 กำลังโหลดไฟล์: {uploaded_file.name}")
+    finally:
+        # --- CLEANUP: ปิดไฟล์และลบ Temp เพื่อคืน Memory ให้ Server ---
+        write_to_terminal("🧹 กำลังทำความสะอาดระบบ...")
+        for c in clips:
+            try:
+                c.close()
+            except:
+                pass
 
-            temp_path = f"temp_{uploaded_file.name}"
-            with open(temp_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+        for temp_file in temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except:
+                pass
+        write_to_terminal("✨ ระบบพร้อมสำหรับงานถัดไป")
 
-            # ใช้ context manager หรือสั่งปิดคลิปหลังประมวลผล
-            clip = VideoFileClip(temp_path).resize(height=1080)
-
-            txt = TextClip(sub_header, fontsize=58, color='cyan', font='DejaVu-Sans-Bold',
-                           bg_color='black').set_opacity(0.6)
-            txt = txt.set_position(('center', 100)).set_duration(clip.duration)
-
-            combined = CompositeVideoClip([clip, txt])
-            clips.append(combined)
-
-            # --- จุดสำคัญ: เราจะยังไม่ลบไฟล์ที่นี่ เพราะ MoviePy ต้องใช้จนกว่าจะ Render เสร็จ ---
-            write_to_terminal(f"✅ เตรียมไฟล์ {uploaded_file.name} สำเร็จ")
-
-        if clips:
-            write_to_terminal("🎬 กำลัง Render... (ขั้นตอนนี้ MoviePy กำลังอ่านไฟล์ชั่วคราวอยู่)")
-            final = concatenate_videoclips(clips, method="compose")
-            output_file = "Jigsaw_Series_Final.mp4"
-            final.write_videofile(output_file, fps=24, codec="libx264")
-
-            # --- ย้ายมาลบไฟล์ทั้งหมดหลัง Render เสร็จแล้ว ---
-            for clip in clips:
-                clip.close()  # สั่งปิดไฟล์ทั้งหมด
-
-            for uploaded_file in uploaded_files:
-                try:
-                    os.remove(f"temp_{uploaded_file.name}")
-                except:
-                    pass  # กันเหนียวถ้าไฟล์ยังล็อคอยู่
-
-            write_to_terminal(f"🎊 Done! ไฟล์อยู่ที่: {output_file}")
-            st.success("✅ รวมคลิปสำเร็จ!")
+else:
+    if start_btn:
+        st.warning("กรุณาอัปโหลดไฟล์วิดีโอก่อนกดปุ่มครับ")
