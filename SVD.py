@@ -1,7 +1,7 @@
 import PIL.Image
 # แก้ปัญหา Pillow 10.0.0+ ที่ไม่มี ANTIALIAS
 if not hasattr(PIL.Image, 'ANTIALIAS'):
-PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
+    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS # <--- บรรทัดนี้ต้องเคาะเว้นวรรคเข้าไป 4 ครั้ง
 import streamlit as st
 import os
 import numpy as np
